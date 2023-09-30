@@ -3,7 +3,7 @@
 // For the full copyright and license information, please view the LICENSE
 // file that was distributed with this source code.
 
-// spell-checker:ignore (ToDO) sourcepath targetpath
+// spell-checker:ignore (ToDO) sourcepath targetpath ENOTEMPTY  EEXIST  EDQUOT  EISDIR  ENOSPC  EMLINK  ETXTBSY
 
 mod error;
 
@@ -23,6 +23,7 @@ use uucore::backup_control::{self, source_is_target_backup, BackupMode};
 use uucore::display::Quotable;
 use uucore::error::{set_exit_code, FromIo, UError, UResult, USimpleError, UUsageError};
 use uucore::fs::{are_hardlinks_or_one_way_symlink_to_same_file, are_hardlinks_to_same_file};
+#[cfg(unix)]
 use uucore::libc::{EDQUOT, EEXIST, EISDIR, EMLINK, ENOSPC, ENOTEMPTY, ETXTBSY};
 use uucore::update_control::{self, UpdateMode};
 use uucore::{format_usage, help_about, help_section, help_usage, prompt_yes, show};
@@ -401,6 +402,7 @@ fn move_files_into_dir(files: &[PathBuf], target_dir: &Path, b: &Behavior) -> UR
             Err(e) if e.to_string().is_empty() => set_exit_code(1),
             Err(e) => {
                 match e.raw_os_error() {
+                    #[cfg(unix)]
                     Some(ENOTEMPTY | EEXIST | EDQUOT | EISDIR | ENOSPC | EMLINK | ETXTBSY) => {
                         // The error message was changed to match GNU's decision
                         // when an issue was filed. These will match when merged upstream.
@@ -495,6 +497,7 @@ fn rename(
                 fs::remove_dir(to)?;
             } else {
                 // TODO: change when 'io::Error::DirectoryNotEmpty' is stabilized.
+                // https://github.com/rust-lang/rust/issues/86442
                 return Err(io::Error::from_raw_os_error(ENOTEMPTY));
             }
         }
